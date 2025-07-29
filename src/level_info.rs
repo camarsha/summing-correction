@@ -13,7 +13,7 @@ pub struct Branch {
     pub val: f64,
     pub dval: f64,
 }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Observation {
     pub from: usize,
     pub to: usize,

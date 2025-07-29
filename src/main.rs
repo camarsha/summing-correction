@@ -11,18 +11,20 @@ fn main() {
     let total_file = "/home/caleb/Research/UNC/Code/Sum-Correction/example-input/tot_eff.dat";
 
     let (levels, branches, obs) = read_levels::read_input(in_file);
-    draw_levels::print_terminal_diagram(&levels, &branches);
-    let (x, f) = sum_correction::make_x_and_f_matrix(&branches, &levels);
-    let energy_matrix = sum_correction::make_tranition_energies(&branches, &levels);
     let mut peak_eff_spline = efficiency::make_efficiency(peak_file);
     let mut total_eff_spline = efficiency::make_efficiency(total_file);
+
+    // draw_levels::print_terminal_diagram(&levels, &branches);
+    let (x, f) = sum_correction::make_x_and_f_matrix(&branches, &levels);
+    let energy_matrix = sum_correction::make_tranition_energies(&branches, &levels);
     let (peak_matrix, total_matrix) = sum_correction::make_eff_matrix(
         &energy_matrix,
         &mut peak_eff_spline,
         &mut total_eff_spline,
     );
 
-    let c = sum_correction::calculate_correction(&x, &f, &peak_matrix, &total_matrix);
-
-    println!("{:?}", c);
+    let correction = sum_correction::calculate_correction(&x, &f, &peak_matrix, &total_matrix);
+    for o in obs.iter() {
+        sum_correction::correct(o.clone(), &correction);
+    }
 }

@@ -17,14 +17,36 @@ fn lower_triangular_multiply(A: &MatrixF64, B: &mut MatrixF64) {
     .unwrap();
 }
 
-fn multiply_and_sum(A: &MatrixF64, B: &MatrixF64, C: &mut MatrixF64) {
+fn lower_triangular_vector_multiply(A: &MatrixF64, x: &mut VectorF64) {
+    blas::level2::dtrmv(
+        rgsl::CblasUplo::Lower,
+        rgsl::CblasTranspose::NoTranspose,
+        rgsl::CblasDiag::NonUnit,
+        A,
+        x,
+    )
+    .unwrap();
+}
+
+fn lower_triangular_vector_multiply_reverse(x: &mut VectorF64, A: &MatrixF64) {
+    blas::level2::dtrmv(
+        rgsl::CblasUplo::Lower,
+        rgsl::CblasTranspose::Transpose,
+        rgsl::CblasDiag::NonUnit,
+        A,
+        x,
+    )
+    .unwrap();
+}
+
+fn matrix_multiply(A: &MatrixF64, B: &MatrixF64, C: &mut MatrixF64) {
     blas::level3::dgemm(
         rgsl::CblasTranspose::NoTranspose,
         rgsl::CblasTranspose::NoTranspose,
         1.0,
         A,
         B,
-        1.0,
+        0.0,
         C,
     )
     .unwrap()
@@ -34,10 +56,7 @@ fn make_square_matrix(n: usize, name: &str) -> MatrixF64 {
     MatrixF64::new(n, n).expect(format!("Failed to allocate {name}!").as_str())
 }
 
-pub fn make_x_and_f_matrix(
-    branchs: &[Branch],
-    levels: &[Level],
-) -> (MatrixF64, VectorF64) {
+pub fn make_x_and_f_matrix(branchs: &[Branch], levels: &[Level]) -> (MatrixF64, VectorF64) {
     // First we construct the x matrix, Eq.2 from Semkow
     let n_levels = levels.len();
     let mut x = MatrixF64::new(n_levels, n_levels).expect("Failed to allocate x matrix.");
@@ -116,11 +135,14 @@ pub fn calculate_correction(
     let mut a = make_square_matrix(n_levels, "a");
     let mut e = make_square_matrix(n_levels, "e");
     let mut b = make_square_matrix(n_levels, "b");
-    a.copy_from(peak_matrix).unwrap();
-    e.copy_from(tot_matrix).unwrap();
+    a.copy_from(x).unwrap();
+    a.mul_elements(peak_matrix).unwrap();
 
-    lower_triangular_multiply(x, &mut a);
-    lower_triangular_multiply(x, &mut e);
+    e.copy_from(x).unwrap();
+    e.mul_elements(tot_matrix).unwrap();
+
+    b.copy_from(x).unwrap();
+
     b.sub(&e).unwrap();
 
     // Now we need the matrices of Eq.5
@@ -128,7 +150,7 @@ pub fn calculate_correction(
     let mut placeholder = make_square_matrix(n_levels, "temp for A");
     A.copy_from(&a).unwrap();
     placeholder.copy_from(&a).unwrap();
-    for i in 1..n_levels{
+    for i in 1..n_levels {
         lower_triangular_multiply(&a, &mut placeholder);
         A.add(&placeholder).unwrap();
     }
@@ -137,7 +159,7 @@ pub fn calculate_correction(
     E.set_identity();
     let mut B = make_square_matrix(n_levels, "B");
     B.copy_from(&b).unwrap();
-    
+
     let mut placeholder = make_square_matrix(n_levels, "temp for B");
     placeholder.copy_from(&b).unwrap();
     for i in 1..n_levels {
@@ -145,10 +167,75 @@ pub fn calculate_correction(
         B.add(&placeholder).unwrap();
     }
 
+    B.add(&E).unwrap();
+
     // N & M from Eq. 6
     let mut N = make_square_matrix(n_levels, "N");
     let mut M = make_square_matrix(n_levels, "M");
+
+    let mut placeholder = VectorF64::new(n_levels).unwrap();
+    placeholder.copy_from(f).unwrap();
+    lower_triangular_vector_multiply_reverse(&mut placeholder, &B);
+    for i in 0..n_levels {
+        N.set(i, i, placeholder.get(i));
+    }
+
+    // M is simple
+    for i in 0..n_levels {
+        M.set(i, i, B.get(i, 0));
+    }
+
+    // Now we do the no summing correction calculation. Eq.8
+    let mut A0 = make_square_matrix(n_levels, "A0");
+    let mut B0 = make_square_matrix(n_levels, "B0");
+    let mut M0 = make_square_matrix(n_levels, "M0");
+    let mut N0 = make_square_matrix(n_levels, "N0");
+
+    A0.copy_from(&a).unwrap();
+    M0.copy_from(&E).unwrap();
+
+    // B0 calculation
+    let mut placeholder = make_square_matrix(n_levels, "temp for B0");
+    B0.copy_from(x).unwrap();
+    placeholder.copy_from(&a).unwrap();
+    for i in 1..n_levels {
+        lower_triangular_multiply(&a, &mut placeholder);
+        B0.add(&placeholder).unwrap();
+    }
+
+    B0.add(&E).unwrap();
+
+    // N0 calculation
+    let mut placeholder = VectorF64::new(n_levels).unwrap();
+    placeholder.copy_from(f).unwrap();
+    lower_triangular_vector_multiply_reverse(&mut placeholder, &B0);
+    for i in 0..n_levels {
+        N0.set(i, i, placeholder.get(i));
+    }
+
+    // Now we calculate S, which is the sum correction and S0 which is
+    // the no sum corrected response. These can then be divided for the correction
+    // matrix
+    let mut S = make_square_matrix(n_levels, "S");
+    let mut S0 = make_square_matrix(n_levels, "S0");
+    let mut placeholder = make_square_matrix(n_levels, "temp for S and S0");
+
+    matrix_multiply(&N, &A, &mut placeholder);
+    matrix_multiply(&placeholder, &M, &mut S);
+
+    placeholder.set_zero();
+    matrix_multiply(&N0, &A0, &mut placeholder);
+    matrix_multiply(&placeholder, &M0, &mut S0);
+
+    S0.div_elements(&S).unwrap();
     
-    
-    A
+    //    tot_matrix.clone().unwrap()
+    S0
+}
+
+pub fn correct(obs: Observation, correction: &MatrixF64) -> f64 {
+    let j = obs.from;
+    let i = obs.to;
+    let c = correction.get(j, i);
+    c * obs.counts
 }
