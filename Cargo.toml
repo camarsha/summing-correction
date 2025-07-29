@@ -1,0 +1,8 @@
+[package]
+name = "sum-correction"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+GSL = "7.0.0"
+rustyline = "16.0.0"
