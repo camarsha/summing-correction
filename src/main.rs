@@ -5,8 +5,6 @@ mod level_info;
 mod read_levels;
 mod sum_correction;
 use clap::Parser;
-use rgsl::rng::unix::rand;
-use statistical::{mean, standard_deviation};
 use indicatif::ProgressBar;
 
 use std::{
@@ -42,7 +40,6 @@ fn main() {
     let mut r = rand::rng();
     let args = Args::parse();
 
-
     // if args.input.is_none() {
     //     interpreter::read_loop().unwrap();
     //     return;
@@ -66,8 +63,8 @@ fn main() {
     let n_samples = args.samples as usize;
 
     let bar = ProgressBar::new(n_samples as u64);
-    
-    let (levels, branches, mut obs) = read_levels::read_input(&in_file, n_samples);
+
+    let (levels, branchs, mut obs) = read_levels::read_input(&in_file, n_samples);
     let mut peak_eff_spline = efficiency::make_efficiency(&peak_file);
     let mut total_eff_spline = efficiency::make_efficiency(&total_file);
 
@@ -75,7 +72,7 @@ fn main() {
         bar.inc(1);
         let temp_level: Vec<level_info::Level> = levels.iter().map(|l| l.sample(&mut r)).collect();
         let temp_branch: Vec<level_info::Branch> =
-            branches.iter().map(|b| b.sample(&mut r)).collect();
+            branchs.iter().map(|b| b.sample(&mut r)).collect();
 
         let (x, f) = sum_correction::make_x_and_f_matrix(&temp_branch, &temp_level);
         let energy_matrix = sum_correction::make_tranition_energies(&temp_branch, &temp_level);
@@ -92,11 +89,10 @@ fn main() {
     }
     bar.finish();
 
-    for o in obs.iter() {
-        println!(
-            "Mean: {} | Std: {}",
-            mean(&o.correction_samples),
-            standard_deviation(&o.correction_samples, None)
-        );
+    let energy_matrix = sum_correction::make_tranition_energies(&branchs, &levels);
+    
+    for o in obs.iter_mut() {
+        let (m, std) = o.corrected_value();
+        println!("E𝛾: {0:.2} | Mean: {m:10.3} | Std: {std:10.3}", energy_matrix.get(o.from, o.to));
     }
 }

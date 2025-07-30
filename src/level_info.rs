@@ -1,6 +1,7 @@
 use rand::prelude::*;
 use rand_distr::{Distribution, Normal};
 use rgsl::MatrixF64;
+use statistical::{mean, standard_deviation};
 
 #[derive(Debug, Clone)]
 pub struct Level {
@@ -95,5 +96,13 @@ impl Observation {
 
     pub fn add_correction(&mut self, idx: usize, m: &MatrixF64) {
         self.correction_samples[idx] = m.get(self.from, self.to);
+    }
+
+    pub fn corrected_value(&mut self) -> (f64, f64) {
+        let c = mean(&self.correction_samples);
+        let dc = standard_deviation(&self.correction_samples, None);
+        let val = self.counts * c;
+        let dval = val * f64::sqrt((dc / c).powi(2) + (self.dcounts / self.counts).powi(2));
+        (val, dval)
     }
 }
