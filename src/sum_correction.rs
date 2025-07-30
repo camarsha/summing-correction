@@ -228,7 +228,7 @@ pub fn calculate_correction(
     matrix_multiply(&placeholder, &M0, &mut S0);
 
     S0.div_elements(&S).unwrap();
-    
+
     //    tot_matrix.clone().unwrap()
     S0
 }

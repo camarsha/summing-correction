@@ -67,7 +67,7 @@ fn parse_branch(line: &str) -> Branch {
     Branch::new(from, to, val, dval)
 }
 
-fn parse_obs(line: &str) -> Observation {
+fn parse_obs(line: &str, n_samples: usize) -> Observation {
     let mut parts = line.split_whitespace();
     let from: usize = parts
         .next()
@@ -90,10 +90,13 @@ fn parse_obs(line: &str) -> Observation {
         .parse()
         .expect("Unable to parse observation counts uncertainty!\n");
 
-    Observation::new(from, to, counts, dcounts)
+    Observation::new(from, to, counts, dcounts, n_samples)
 }
 
-pub fn read_input(file_path: &str) -> (Vec<Level>, Vec<Branch>, Vec<Observation>) {
+pub fn read_input(
+    file_path: &str,
+    n_samples: usize,
+) -> (Vec<Level>, Vec<Branch>, Vec<Observation>) {
     let file_content =
         fs::read_to_string(file_path).expect(format!("Failed to read: {file_path}\n").as_str());
     let mut current_section = FileSection::None;
@@ -115,7 +118,7 @@ pub fn read_input(file_path: &str) -> (Vec<Level>, Vec<Branch>, Vec<Observation>
             FileSection::None => current_section = parse_header(trimmed),
             FileSection::EnergyLevels => levels.push(parse_energy(trimmed, counter())),
             FileSection::BValues => branchs.push(parse_branch(trimmed)),
-            FileSection::ObservedValues => obs.push(parse_obs(trimmed)),
+            FileSection::ObservedValues => obs.push(parse_obs(trimmed, n_samples)),
         }
     }
     (levels, branchs, obs)

@@ -1,79 +1,50 @@
 use crate::level_info::{Branch, Level};
-use std::collections::HashMap;
-use std::fs::File;
-use std::io::Write;
+use ratatui::{
+    backend::CrosstermBackend,
+    layout::{Constraint, Direction, Layout},
+    style::{Style, Modifier},
+    text::{Span, Spans},
+    widgets::{Block, Borders, Paragraph},
+    Terminal,
+};
+use crossterm::{
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
+    execute,
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+};
+use std::io;
 
-/// This is all gpt crap.
 
-pub fn write_dot_file(
-    levels: &[Level],
-    transitions: &[Branch],
-    filename: &str,
-) -> std::io::Result<()> {
-    let mut file = File::create(filename)?;
+pub fn draw_cascade<B: Backend>(f: &mut Frame<B>, area: ratatui::layout::Rect, levels: &[Level], branches: &[Branch]) {
+    let mut levels_sorted = levels.to_vec();
+    levels_sorted.sort_by(|a, b| b.energy.partial_cmp(&a.energy).unwrap());
 
-    writeln!(file, "digraph G {{")?;
-    writeln!(file, "  rankdir=TB;")?; // levels from top (high E) to bottom
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(vec![Constraint::Length(3); levels_sorted.len()])
+        .split(area);
 
-    // Define level nodes with energy labels
-    for level in levels {
-        writeln!(
-            file,
-            "  {} [label=\"{}\\n{:.1} keV\", shape=ellipse];",
-            level.idx, level.idx, level.energy
-        )?;
-    }
+    for (i, level) in levels_sorted.iter().enumerate() {
+        let mut lines = vec![
+            Spans::from(vec![
+                Span::styled(format!("Level {}", level.idx), Style::default().add_modifier(Modifier::BOLD)),
+                Span::raw(format!(" — {:.3} ± {:.3} MeV", level.energy, level.denergy)),
+            ]),
+            Spans::from(vec![
+                Span::raw(format!("Feeding: {:.3} ± {:.3}", level.feeding, level.dfeeding)),
+            ]),
+        ];
 
-    // Add transitions as directed edges
-    let energy_map: HashMap<_, _> = levels
-        .iter()
-        .map(|lvl| (lvl.idx.clone(), lvl.energy))
-        .collect();
-
-    for trans in transitions {
-        if let (Some(&e1), Some(&e2)) = (energy_map.get(&trans.from), energy_map.get(&trans.to)) {
-            let e_gamma = e1 - e2;
-            writeln!(
-                file,
-                "  {} -> {} [label=\"{:.1} keV\\nI={:.2}\"];",
-                trans.from, trans.to, e_gamma, trans.val
-            )?;
+        // Add any transitions from this level
+        for b in branches.iter().filter(|b| b.from == level.idx) {
+            lines.push(Spans::from(Span::raw(format!(
+                "↓ to {}: {:.3} ± {:.3}",
+                b.to, b.val, b.dval
+            ))));
         }
-    }
 
-    writeln!(file, "}}")?;
-    Ok(())
-}
-
-pub fn print_terminal_diagram(levels: &[Level], transitions: &[Branch]) {
-    // Sort levels by descending energy for top-down display
-    let mut sorted_levels = levels.to_vec();
-    sorted_levels.sort_by(|a, b| b.energy.partial_cmp(&a.energy).unwrap());
-
-    // Map for easy access to transitions from each level
-    let mut transition_map: HashMap<usize, Vec<(usize, f64)>> = HashMap::new();
-    let level_map: HashMap<_, _> = levels.iter().map(|lvl| (lvl.idx, lvl.energy)).collect();
-
-    for trans in transitions {
-        if let (Some(&e_from), Some(&e_to)) = (level_map.get(&trans.from), level_map.get(&trans.to))
-        {
-            let e_gamma = e_from - e_to;
-            transition_map
-                .entry(trans.from)
-                .or_default()
-                .push((trans.to, e_gamma));
-        }
-    }
-
-    // Print each level and transitions below it
-    for level in &sorted_levels {
-        println!("{:>7.1} keV ── [{}]", level.energy, level.idx);
-        let key = level.idx;
-        if let Some(edges) = transition_map.get(&key) {
-            for (target, e_gamma) in edges {
-                println!("             │");
-                println!("             ▼ {:.1} keV ", e_gamma);
-            }
-        }
+        let para = Paragraph::new(Text::from(lines))
+            .block(Block::default().borders(Borders::ALL));
+        f.render_widget(para, chunks[i]);
     }
 }
