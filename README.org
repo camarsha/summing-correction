@@ -5,9 +5,9 @@
   can correct a measured peak intensity to a summing free peak intensity. Using the definitions of Semkov
   this is done using the expression:
 
-  ```math
-C_{ji} = \frac{[\mathbf{NAM}]_{ji}}{\mathbf{[N^{(0)}A^{(0)}M^{(0)}}]_{ji}}
-```
+
+$$C_{ji} = \frac{[\mathbf{NAM}]_{ji}}{\mathbf{[N^{(0)}A^{(0)}M^{(0)}}]_{ji}}$$
+
 
 This correction matrix can then be applied to each of the measured transitions.
 
