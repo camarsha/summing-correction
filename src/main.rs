@@ -7,11 +7,6 @@ mod sum_correction;
 use clap::Parser;
 use indicatif::ProgressBar;
 
-use std::{
-    env,
-    path::{self, Path},
-    process::exit,
-};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
