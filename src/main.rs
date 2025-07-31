@@ -90,9 +90,10 @@ fn main() {
     bar.finish();
 
     let energy_matrix = sum_correction::make_tranition_energies(&branchs, &levels);
-    
+
+    println!("E𝛾,counts,dcounts,corrected,dcorrected");
     for o in obs.iter_mut() {
         let (m, std) = o.corrected_value();
-        println!("E𝛾: {0:.2} | Mean: {m:10.3} | Std: {std:10.3}", energy_matrix.get(o.from, o.to));
+        println!("{0:.2},{1:.3},{2:.3},{m:.3},{std:.3}", energy_matrix.get(o.from, o.to), o.counts, o.dcounts);
     }
 }
