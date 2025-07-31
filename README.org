@@ -12,4 +12,7 @@ $$C_{ji} = \frac{[\mathbf{NAM}]_{ji}}{\mathbf{[N^{(0)}A^{(0)}M^{(0)}}]_{ji}}$$
 This correction matrix can then be applied to each of the measured transitions.
 
 ** TODO Visualization for Cascade
-** TODO Uncertainty Propagation
+** Uncertainty Propagation
+   Branching ratios and feeding fractions can come with uncertainties, these will then be
+   propagated using Monte Carlo. The default number of samples is 10000. Matrix multiplication
+   is done using BLAS, so this will use 100% of your CPU.
