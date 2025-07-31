@@ -28,6 +28,19 @@ pub struct Observation {
     pub correction_samples: Vec<f64>,
 }
 
+fn truncated_normal(mu: f64, std: f64, r: &mut ThreadRng) -> f64 {
+    if mu == 0.0 {
+        return 0.0;
+    }
+    let norm = Normal::new(mu, std).unwrap();
+    loop {
+        let s: f64 = norm.sample(r);
+        if s > 0.0 {
+            break s;
+        }
+    }
+}
+
 impl Level {
     pub fn new(idx: usize, energy: f64, denergy: f64, feeding: f64, dfeeding: f64) -> Self {
         Self {
@@ -39,13 +52,11 @@ impl Level {
         }
     }
 
-    pub fn sample(&self, mut r: &mut ThreadRng) -> Self {
+    pub fn sample(&self, r: &mut ThreadRng) -> Self {
         let idx = self.idx;
         let energy = self.energy;
         let denergy = self.denergy;
-        let feeding = Normal::new(self.feeding, self.dfeeding)
-            .unwrap()
-            .sample(&mut r);
+        let feeding = truncated_normal(self.feeding, self.dfeeding, r);
         let dfeeding = 0.0;
 
         Self {
@@ -67,11 +78,10 @@ impl Branch {
             dval,
         }
     }
-    pub fn sample(&self, mut r: &mut ThreadRng) -> Self {
+    pub fn sample(&self, r: &mut ThreadRng) -> Self {
         let from = self.from;
         let to = self.to;
-
-        let val = Normal::new(self.val, self.dval).unwrap().sample(&mut r);
+        let val = truncated_normal(self.val, self.dval, r);
         let dval = 0.0;
 
         Self {
@@ -98,11 +108,14 @@ impl Observation {
         self.correction_samples[idx] = m.get(self.from, self.to);
     }
 
-    pub fn corrected_value(&mut self) -> (f64, f64) {
+    pub fn corrected_value(&mut self) -> Result<(f64, f64), ()> {
         let c = mean(&self.correction_samples);
+        if c.is_nan() {
+            return Err(());
+        }
         let dc = standard_deviation(&self.correction_samples, None);
         let val = self.counts * c;
         let dval = val * f64::sqrt((dc / c).powi(2) + (self.dcounts / self.counts).powi(2));
-        (val, dval)
+        Ok((val, dval))
     }
 }

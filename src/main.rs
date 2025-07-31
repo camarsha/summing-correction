@@ -64,7 +64,7 @@ fn main() {
 
     let bar = ProgressBar::new(n_samples as u64);
 
-    let (levels, branchs, mut obs) = read_levels::read_input(&in_file, n_samples);
+    let (levels, branches, mut obs) = read_levels::read_input(&in_file, n_samples);
     let mut peak_eff_spline = efficiency::make_efficiency(&peak_file);
     let mut total_eff_spline = efficiency::make_efficiency(&total_file);
 
@@ -72,7 +72,7 @@ fn main() {
         bar.inc(1);
         let temp_level: Vec<level_info::Level> = levels.iter().map(|l| l.sample(&mut r)).collect();
         let temp_branch: Vec<level_info::Branch> =
-            branchs.iter().map(|b| b.sample(&mut r)).collect();
+            branches.iter().map(|b| b.sample(&mut r)).collect();
 
         let (x, f) = sum_correction::make_x_and_f_matrix(&temp_branch, &temp_level);
         let energy_matrix = sum_correction::make_tranition_energies(&temp_branch, &temp_level);
@@ -89,11 +89,21 @@ fn main() {
     }
     bar.finish();
 
-    let energy_matrix = sum_correction::make_tranition_energies(&branchs, &levels);
+    let energy_matrix = sum_correction::make_tranition_energies(&branches, &levels);
 
     println!("E𝛾,counts,dcounts,corrected,dcorrected");
     for o in obs.iter_mut() {
-        let (m, std) = o.corrected_value();
-        println!("{0:.2},{1:.3},{2:.3},{m:.3},{std:.3}", energy_matrix.get(o.from, o.to), o.counts, o.dcounts);
+        match o.corrected_value() {
+            Ok((m, std)) => println!(
+                "{0:.2},{1:.3},{2:.3},{m:.3},{std:.3}",
+                energy_matrix.get(o.from, o.to),
+                o.counts,
+                o.dcounts
+            ),
+            Err(()) => eprintln!(
+                "Observed transition from {} to {} was not defined in the B-Values section of {}, skipping!",
+                o.from, o.to, in_file
+            ),
+        };
     }
 }
