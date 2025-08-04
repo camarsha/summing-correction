@@ -12,11 +12,14 @@ pub struct Efficiency {
 }
 
 impl Efficiency {
+    #[allow(unused_mut)]
     fn new(energies: Vec<f64>, eff: Vec<f64>) -> Self {
         let interp_type = InterpType::cspline();
         let mut interp =
             Interp::new(interp_type, energies.len()).expect("Failed to initialize cubic spline");
-        interp.init(&energies, &eff);
+        interp
+            .init(&energies, &eff)
+            .expect("Failed to initialize spline!");
         let mut interp_acc = InterpAccel::new();
         Self {
             energies,
@@ -38,14 +41,17 @@ impl Efficiency {
 }
 pub fn make_efficiency(file_path: &str) -> Efficiency {
     let file_content =
-        fs::read_to_string(file_path).expect(format!("Failed to read: {file_path}\n").as_str());
+        fs::read_to_string(file_path).expect(format!("Failed to read: {file_path}! \n").as_str());
 
     let mut energies: Vec<f64> = Vec::new();
     let mut eff: Vec<f64> = Vec::new();
     for line in file_content.lines() {
         let nums: Vec<f64> = line
             .split_whitespace()
-            .map(|p| p.parse().expect("Failed to parse line in efficiency file!"))
+            .map(|p| {
+                p.parse()
+                    .expect("Failed to parse line in efficiency file!\n")
+            })
             .collect();
         energies.push(nums[0]);
         eff.push(nums[1]);

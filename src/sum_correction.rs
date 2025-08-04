@@ -1,9 +1,10 @@
 use crate::{
     efficiency::Efficiency,
-    level_info::{Branch, Level, Observation},
+    level_info::{Branch, Level},
 };
-use rgsl::{MatrixF64, VectorF64, blas};
+use rgsl::{blas, MatrixF64, VectorF64};
 
+#[allow(non_snake_case)]
 fn lower_triangular_multiply(A: &MatrixF64, B: &mut MatrixF64) {
     blas::level3::dtrmm(
         rgsl::CblasSide::Left,
@@ -17,17 +18,7 @@ fn lower_triangular_multiply(A: &MatrixF64, B: &mut MatrixF64) {
     .unwrap();
 }
 
-fn lower_triangular_vector_multiply(A: &MatrixF64, x: &mut VectorF64) {
-    blas::level2::dtrmv(
-        rgsl::CblasUplo::Lower,
-        rgsl::CblasTranspose::NoTranspose,
-        rgsl::CblasDiag::NonUnit,
-        A,
-        x,
-    )
-    .unwrap();
-}
-
+#[allow(non_snake_case)]
 fn lower_triangular_vector_multiply_reverse(x: &mut VectorF64, A: &MatrixF64) {
     blas::level2::dtrmv(
         rgsl::CblasUplo::Lower,
@@ -39,6 +30,7 @@ fn lower_triangular_vector_multiply_reverse(x: &mut VectorF64, A: &MatrixF64) {
     .unwrap();
 }
 
+#[allow(non_snake_case)]
 fn matrix_multiply(A: &MatrixF64, B: &MatrixF64, C: &mut MatrixF64) {
     blas::level3::dgemm(
         rgsl::CblasTranspose::NoTranspose,
@@ -88,7 +80,7 @@ pub fn make_x_and_f_matrix(branchs: &[Branch], levels: &[Level]) -> (MatrixF64, 
     (x, f)
 }
 
-pub fn make_tranition_energies(branchs: &[Branch], levels: &[Level]) -> MatrixF64 {
+pub fn make_transition_energies(branchs: &[Branch], levels: &[Level]) -> MatrixF64 {
     let n_levels = levels.len();
     let mut energy_matrix =
         MatrixF64::new(n_levels, n_levels).expect("Failed to allocate matrix for gamma energies");
@@ -150,7 +142,7 @@ pub fn calculate_correction(
     let mut placeholder = make_square_matrix(n_levels, "temp for A");
     A.copy_from(&a).unwrap();
     placeholder.copy_from(&a).unwrap();
-    for i in 1..n_levels {
+    for _i in 1..n_levels {
         lower_triangular_multiply(&a, &mut placeholder);
         A.add(&placeholder).unwrap();
     }
@@ -162,7 +154,7 @@ pub fn calculate_correction(
 
     let mut placeholder = make_square_matrix(n_levels, "temp for B");
     placeholder.copy_from(&b).unwrap();
-    for i in 1..n_levels {
+    for _i in 1..n_levels {
         lower_triangular_multiply(&b, &mut placeholder);
         B.add(&placeholder).unwrap();
     }
@@ -198,7 +190,7 @@ pub fn calculate_correction(
     let mut placeholder = make_square_matrix(n_levels, "temp for B0");
     B0.copy_from(x).unwrap();
     placeholder.copy_from(&a).unwrap();
-    for i in 1..n_levels {
+    for _i in 1..n_levels {
         lower_triangular_multiply(&a, &mut placeholder);
         B0.add(&placeholder).unwrap();
     }
@@ -227,15 +219,8 @@ pub fn calculate_correction(
     matrix_multiply(&N0, &A0, &mut placeholder);
     matrix_multiply(&placeholder, &M0, &mut S0);
 
+    // Divide elements in place
     S0.div_elements(&S).unwrap();
 
-    //    tot_matrix.clone().unwrap()
     S0
-}
-
-pub fn correct(obs: Observation, correction: &MatrixF64) -> f64 {
-    let j = obs.from;
-    let i = obs.to;
-    let c = correction.get(j, i);
-    c * obs.counts
 }

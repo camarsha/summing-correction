@@ -1,9 +1,9 @@
-mod draw_levels;
 mod efficiency;
 mod level_info;
 mod read_levels;
 mod sum_correction;
 use clap::Parser;
+use color_eyre::eyre::Result;
 use indicatif::ProgressBar;
 use level_info::Observation;
 use rgsl::MatrixF64;
@@ -82,35 +82,32 @@ fn print_function(
 fn write_output(obs: &mut [Observation], energy_matrix: &MatrixF64, in_file: &str, out_file: &str) {
     let output = File::create(out_file).expect("Failed to create output file!");
     let mut buf_writer = BufWriter::new(output);
-    let _ = buf_writer.write("Eg,counts,dcounts,corrected,dcorrected\n".as_bytes());
+    writeln!(buf_writer, "Eg,counts,dcounts,corrected,dcorrected")
+        .expect("Failed to write csv header!");
     for o in obs.iter_mut() {
         match o.corrected_value() {
-            Ok((m, std)) => buf_writer
-                .write(
-                    format!(
-                        "{0:.2},{1:.3},{2:.3},{m:.3},{std:.3}\n",
-                        energy_matrix.get(o.from, o.to),
-                        o.counts,
-                        o.dcounts
-                    )
-                    .as_bytes(),
-                )
-                .expect("Write failed!"),
+            Ok((m, std)) => writeln!(
+                buf_writer,
+                "{0:.2},{1:.3},{2:.3},{m:.3},{std:.3}",
+                energy_matrix.get(o.from, o.to),
+                o.counts,
+                o.dcounts
+            )
+            .expect("Data write failed!"),
             Err(()) => {
                 eprintln!(
                     "Observed transition from {} to {} was not defined in the B-Values section of {}, skipping!",
                     o.from, o.to, in_file
                 );
-                0
             }
         };
     }
 }
 
-fn main() {
-    // First lets keep around some paths for convenience.
-    // let home_dir = env::home_dir().expect("Failed to locate home directory.");
-    // let current_dir = env::current_dir().expect("Failed to locate current directory.");
+fn main() -> Result<()> {
+    // Better panic messages.
+    color_eyre::install()?;
+
     let mut r = rand::rng();
     let args = Args::parse();
 
@@ -141,7 +138,7 @@ fn main() {
             branches.iter().map(|b| b.sample(&mut r)).collect();
 
         let (x, f) = sum_correction::make_x_and_f_matrix(&temp_branch, &temp_level);
-        let energy_matrix = sum_correction::make_tranition_energies(&temp_branch, &temp_level);
+        let energy_matrix = sum_correction::make_transition_energies(&temp_branch, &temp_level);
         let (peak_matrix, total_matrix) = sum_correction::make_eff_matrix(
             &energy_matrix,
             &mut peak_eff_spline,
@@ -155,13 +152,13 @@ fn main() {
     }
     bar.finish();
 
-    let energy_matrix = sum_correction::make_tranition_energies(&branches, &levels);
+    let energy_matrix = sum_correction::make_transition_energies(&branches, &levels);
 
-    if args.output.is_none() {
-        print_function(&mut obs, &energy_matrix, &in_file, args.human_readable);
+    if let Some(out_file) = args.output {
+        write_output(&mut obs, &energy_matrix, &in_file, &out_file);
     } else {
-        if let Some(out_file) = args.output {
-            write_output(&mut obs, &energy_matrix, &in_file, &out_file);
-        }
+        print_function(&mut obs, &energy_matrix, &in_file, args.human_readable);
     }
+
+    Ok(())
 }
