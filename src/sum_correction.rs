@@ -2,7 +2,7 @@ use crate::{
     efficiency::Efficiency,
     level_info::{Branch, Level},
 };
-use rgsl::{blas, MatrixF64, VectorF64};
+use rgsl::{MatrixF64, VectorF64, blas};
 
 #[allow(non_snake_case)]
 fn lower_triangular_multiply(A: &MatrixF64, B: &mut MatrixF64) {
@@ -42,6 +42,20 @@ fn matrix_multiply(A: &MatrixF64, B: &MatrixF64, C: &mut MatrixF64) {
         C,
     )
     .unwrap()
+}
+
+fn print_matrix(m: &MatrixF64, name: &str) {
+    let n = m.size1();
+    println!("{name}:");
+    for i in 0..n {
+        let row = m.get_row(i).unwrap();
+        print!("[");
+        for j in 0..n {
+            print!("{:4.4}, ", row.get(j));
+        }
+        println!("]");
+    }
+    println!("END");
 }
 
 fn make_square_matrix(n: usize, name: &str) -> MatrixF64 {
@@ -189,9 +203,9 @@ pub fn calculate_correction(
     // B0 calculation
     let mut placeholder = make_square_matrix(n_levels, "temp for B0");
     B0.copy_from(x).unwrap();
-    placeholder.copy_from(&a).unwrap();
+    placeholder.copy_from(&x).unwrap();
     for _i in 1..n_levels {
-        lower_triangular_multiply(&a, &mut placeholder);
+        lower_triangular_multiply(&x, &mut placeholder);
         B0.add(&placeholder).unwrap();
     }
 
@@ -204,7 +218,6 @@ pub fn calculate_correction(
     for i in 0..n_levels {
         N0.set(i, i, placeholder.get(i));
     }
-
     // Now we calculate S, which is the sum correction and S0 which is
     // the no sum corrected response. These can then be divided for the correction
     // matrix
