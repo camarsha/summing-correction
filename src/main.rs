@@ -37,6 +37,10 @@ struct Args {
     /// Output formatted for humans
     #[arg(short, long, default_value_t = false)]
     human_readable: bool,
+
+    /// Just a single run, no sampling
+    #[arg(short, long, default_value_t = false)]
+    no_samples: bool,
 }
 
 fn print_function(
@@ -123,38 +127,60 @@ fn main() -> Result<()> {
         None => "tot_eff.dat".to_string(),
     };
 
-    let n_samples = args.samples as usize;
-
-    let bar = ProgressBar::new(n_samples as u64);
+    let n_samples = if args.no_samples || args.samples < 1 {
+        1 as usize
+    } else {
+        args.samples as usize
+    };
 
     let (levels, branches, mut obs) = read_levels::read_input(&in_file, n_samples);
     let mut peak_eff_spline = efficiency::make_efficiency(&peak_file);
     let mut total_eff_spline = efficiency::make_efficiency(&total_file);
 
-    for i in 0..n_samples {
-        bar.inc(1);
-        let temp_level: Vec<level_info::Level> = levels.iter().map(|l| l.sample(&mut r)).collect();
-        let temp_branch: Vec<level_info::Branch> =
-            branches.iter().map(|b| b.sample(&mut r)).collect();
-
-        let (x, f) = sum_correction::make_x_and_f_matrix(&temp_branch, &temp_level);
-        let energy_matrix = sum_correction::make_transition_energies(&temp_branch, &temp_level);
+    if args.no_samples || n_samples <= 1 {
+        let (x, f) = sum_correction::make_x_and_f_matrix(&branches, &levels);
+        let energy_matrix = sum_correction::make_transition_energies(&branches, &levels);
         let (peak_matrix, total_matrix) = sum_correction::make_eff_matrix(
             &energy_matrix,
             &mut peak_eff_spline,
             &mut total_eff_spline,
         );
-
         let correction = sum_correction::calculate_correction(&x, &f, &peak_matrix, &total_matrix);
         for o in obs.iter_mut() {
-            o.add_correction(i, &correction);
+            o.add_correction(0, &correction);
         }
-    }
-    bar.finish();
+    } else {
+        let bar = ProgressBar::new(n_samples as u64);
+        for i in 0..n_samples {
+            bar.inc(1);
+            let temp_level: Vec<level_info::Level> =
+                levels.iter().map(|l| l.sample(&mut r)).collect();
+            let temp_branch: Vec<level_info::Branch> =
+                branches.iter().map(|b| b.sample(&mut r)).collect();
 
+            let (x, f) = sum_correction::make_x_and_f_matrix(&temp_branch, &temp_level);
+            let energy_matrix = sum_correction::make_transition_energies(&temp_branch, &temp_level);
+            let (peak_matrix, total_matrix) = sum_correction::make_eff_matrix(
+                &energy_matrix,
+                &mut peak_eff_spline,
+                &mut total_eff_spline,
+            );
+
+            let correction =
+                sum_correction::calculate_correction(&x, &f, &peak_matrix, &total_matrix);
+            for o in obs.iter_mut() {
+                o.add_correction(i, &correction);
+            }
+        }
+        bar.finish();
+    }
     let energy_matrix = sum_correction::make_transition_energies(&branches, &levels);
 
     if let Some(out_file) = args.output {
+        // You can still see nice output if you want it.
+        if args.human_readable {
+            print_function(&mut obs, &energy_matrix, &in_file, args.human_readable);
+        }
         write_output(&mut obs, &energy_matrix, &in_file, &out_file);
     } else {
         print_function(&mut obs, &energy_matrix, &in_file, args.human_readable);

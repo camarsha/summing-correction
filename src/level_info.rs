@@ -109,13 +109,19 @@ impl Observation {
     }
 
     pub fn corrected_value(&mut self) -> Result<(f64, f64), ()> {
-        let c = mean(&self.correction_samples);
-        if c.is_nan() {
-            return Err(());
+        if self.correction_samples.len() > 1 {
+            let c = mean(&self.correction_samples);
+            if c.is_nan() {
+                return Err(());
+            }
+            let dc = standard_deviation(&self.correction_samples, None);
+            let val = self.counts * c;
+            let dval = val * f64::sqrt((dc / c).powi(2) + (self.dcounts / self.counts).powi(2));
+            Ok((val, dval))
+        } else {
+            let val = self.counts * self.correction_samples[0];
+            let dval = val * (self.dcounts / self.counts);
+            Ok((val, dval))
         }
-        let dc = standard_deviation(&self.correction_samples, None);
-        let val = self.counts * c;
-        let dval = val * f64::sqrt((dc / c).powi(2) + (self.dcounts / self.counts).powi(2));
-        Ok((val, dval))
     }
 }
