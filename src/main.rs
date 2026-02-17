@@ -3,7 +3,7 @@ mod level_info;
 mod read_levels;
 mod sum_correction;
 use clap::Parser;
-use color_eyre::eyre::Result;
+use color_eyre::eyre::{Result, eyre};
 use indicatif::ProgressBar;
 use level_info::Observation;
 use rgsl::MatrixF64;
@@ -36,11 +36,15 @@ struct Args {
 
     /// Output formatted for humans
     #[arg(short, long, default_value_t = false)]
-    human_readable: bool,
+    readable: bool,
 
     /// Just a single run, no sampling
     #[arg(short, long, default_value_t = false)]
     no_samples: bool,
+
+    /// Observed counts for a single transition. <inital state> <final state> <counts> <dcounts>
+    #[arg(short, long, num_args = 4, value_delimiter = ' ')]
+    counts: Option<Vec<f64>>,
 }
 
 fn print_function(
@@ -128,12 +132,30 @@ fn main() -> Result<()> {
     };
 
     let n_samples = if args.no_samples || args.samples < 1 {
-        1 as usize
+        1
     } else {
         args.samples as usize
     };
 
     let (levels, branches, mut obs) = read_levels::read_input(&in_file, n_samples);
+
+    // Now if the user gave a count input we add it to the obs
+    if let Some(counts) = args.counts {
+        if counts[0].fract() != 0.0 {
+            return Err(eyre!("First argument to --counts must be an integer!"));
+        }
+        if counts[1].fract() != 0.0 {
+            return Err(eyre!("Second argument to --counts must be an integer!"));
+        }
+        obs.push(Observation::new(
+            counts[0] as usize,
+            counts[1] as usize,
+            counts[2],
+            counts[3],
+            n_samples,
+        ));
+    }
+
     let mut peak_eff_spline = efficiency::make_efficiency(&peak_file);
     let mut total_eff_spline = efficiency::make_efficiency(&total_file);
 
@@ -178,12 +200,12 @@ fn main() -> Result<()> {
 
     if let Some(out_file) = args.output {
         // You can still see nice output if you want it.
-        if args.human_readable {
-            print_function(&mut obs, &energy_matrix, &in_file, args.human_readable);
+        if args.readable {
+            print_function(&mut obs, &energy_matrix, &in_file, args.readable);
         }
         write_output(&mut obs, &energy_matrix, &in_file, &out_file);
     } else {
-        print_function(&mut obs, &energy_matrix, &in_file, args.human_readable);
+        print_function(&mut obs, &energy_matrix, &in_file, args.readable);
     }
 
     Ok(())

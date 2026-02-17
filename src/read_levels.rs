@@ -114,6 +114,11 @@ pub fn read_input(
             current_section = FileSection::None;
             continue;
         }
+        if line.chars().nth(0) == Some('#') {
+            current_section = FileSection::None;
+            continue;
+        }
+
         match current_section {
             FileSection::None => current_section = parse_header(trimmed),
             FileSection::EnergyLevels => levels.push(parse_energy(trimmed, counter())),
