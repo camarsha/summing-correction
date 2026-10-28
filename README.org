@@ -6,7 +6,7 @@
   this is done using the expression:
 
 
-$$C_{ji} = \frac{[\mathbf{NAM}]_{ji}}{\mathbf{[N^{(0)}A^{(0)}M^{(0)}}]_{ji}}$$
+\(C_{ji} = \frac{\mathbf{[N^{(0)}A^{(0)}M^{(0)}}]_{ji}}{[\mathbf{NAM}]_{ji}}\)
 
 
 This correction matrix can then be applied to each of the measured transitions.
@@ -15,3 +15,51 @@ This correction matrix can then be applied to each of the measured transitions.
    Branching ratios and feeding fractions can come with uncertainties, these will then be
    propagated using Monte Carlo. The default number of samples is 10000. Matrix multiplication
    is done using BLAS, expect a high CPU load.
+
+
+* Use
+
+A calculation needs an input file (an example 22Ne file is in the repository), peak efficiency file, and total efficiency file. By default the program looks for files in the directory called ~peak_eff.dat~ and ~tot_eff.dat~. Most calls will look like:
+
+#+begin_src bash
+sum-correction <input-file-path>
+#+end_src
+
+If your efficiency curves are elsewhere:
+
+#+begin_src bash
+sum-correction <input-file-path> -p <peak-eff-file-path> -t <tot-eff-file-path>
+#+end_src
+
+Other options can be found in the help output:
+
+#+begin_src bash
+  $ sum-correction --help                                                                                        
+
+  Correct gamma ray intensities based on the summing correction formalism of Semkov
+
+  Usage: sum-correction [OPTIONS] <INPUT>
+
+  Arguments:
+    <INPUT>  Input file with branching level, branching ratios, and observed values
+
+  Options:
+    -p, --peak-eff-file <PEAK_EFF_FILE>
+            Path to the two column peak efficiency file
+    -t, --total-eff-file <TOTAL_EFF_FILE>
+            Path to the two column total efficiency file
+    -s, --samples <SAMPLES>
+            Number of Monte-Carlo samples to run [default: 10000]
+    -o, --output <OUTPUT>
+            Output file
+    -r, --readable
+            Output formatted for humans
+    -n, --no-samples
+            Just a single run, no sampling
+    -c, --counts <COUNTS> <COUNTS> <COUNTS> <COUNTS>
+            Observed counts for a single transition. <inital state> <final state> <counts> <dcounts>
+    -h, --help
+            Print help
+    -V, --version
+            Print version
+#+end_src
