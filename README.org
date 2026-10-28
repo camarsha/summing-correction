@@ -6,7 +6,7 @@
   this is done using the expression:
 
 
-\(C_{ji} = \frac{\mathbf{[N^{(0)}A^{(0)}M^{(0)}}]_{ji}}{[\mathbf{NAM}]_{ji}}\)
+$C_{ji} = \frac{\mathbf{[N^{(0)}A^{(0)}M^{(0)}}]_{ji}}{[\mathbf{NAM}]_{ji}}$
 
 
 This correction matrix can then be applied to each of the measured transitions.
